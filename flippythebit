@@ -1,0 +1,85 @@
+let running = false;
+
+function findEnemies() {
+    return Array.from(game.children).filter(
+        c => c.id.startsWith("enemy")
+    );
+}
+
+function getButtons() {
+    const enemies = findEnemies();
+
+    const target = enemies.find(
+        e => !(e.getAttribute("class") || "").includes("under-attack")
+    );
+
+    if (!target) return null;
+
+    const nr = parseInt(target.getAttribute("data-nr"), 10);
+
+    if (!Number.isInteger(nr) || nr < 0) return null;
+
+    return (nr & 255)
+        .toString(2)
+        .padStart(8, "0")
+        .split("")
+        .map(bit => bit === "1");
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// . = avvia, - = ferma
+document.addEventListener("keydown", function(event) {
+    if (event.repeat) return;
+
+    if (event.key === ".") {
+        start();
+    } else if (event.key === "-") {
+        stop();
+    }
+});
+
+async function start() {
+    if (running) return;
+
+    running = true;
+    console.log("Avviato — premi - per fermare");
+
+    try {
+        while (running) {
+            const buttons = getButtons();
+
+            if (buttons) {
+                for (let i = 0; i < 8; i++) {
+                    if (!running) break;
+
+                    if (buttons[i]) {
+                        const keyCode = 49 + i;
+
+                        $("html").trigger(
+                            jQuery.Event("keypress", {
+                                which: keyCode,
+                                keyCode: keyCode,
+                                key: String(i + 1)
+                            })
+                        );
+
+                        await sleep(400 + Math.random() * 400);
+                    }
+                }
+            }
+
+            await sleep(600 + Math.random() * 600);
+        }
+    } finally {
+        running = false;
+        console.log("Terminato");
+    }
+}
+
+function stop() {
+    running = false;
+    console.log("Script fermato");
+}

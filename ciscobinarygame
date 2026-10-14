@@ -1,0 +1,183 @@
+
+const calculatorMap = [
+    2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+];
+
+let running = false;
+let busy = false;
+let skipRequested = false;
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function randomDelay(min = 600, max = 1000) {
+    return min + Math.random() * (max - min);
+}
+
+function getCurrentProblem() {
+    return document.querySelector(".problem:not(.blank-exit)");
+}
+
+async function runStep() {
+    if (!running || busy || skipRequested) return;
+
+    busy = true;
+
+    try {
+        const problem = getCurrentProblem();
+        if (!problem) return;
+
+        const div = problem.querySelector(
+            ".problem-wrapper>.sub-wrapper"
+        );
+        if (!div) return;
+
+        if (problem.querySelector(".isProblem")) {
+            // Calcolo del valore binario
+            const digits = div.querySelector(".digits");
+            if (!digits) return;
+
+            let sum = 0;
+            div.querySelectorAll(".bit").forEach((e, i) => {
+                sum += Number(e.innerText) * 2 ** (7 - i);
+            });
+
+            console.log("Risposta:", sum);
+
+            // Apri la calcolatrice
+            digits.click();
+            await sleep(randomDelay(700, 1100));
+            if (!running || skipRequested) return;
+
+            // Inserisci le cifre
+            for (const digit of String(sum)) {
+                if (!running || skipRequested) return;
+
+                const index = calculatorMap[Number(digit)];
+                const button = document.querySelector(
+                    `.calculator :nth-child(${index})`
+                );
+
+                if (button) {
+                    button.click();
+                    await sleep(randomDelay(600, 1000));
+                } else {
+                    console.warn("Tasto calcolatrice non trovato:", digit);
+                    return;
+                }
+            }
+
+            if (!running || skipRequested) return;
+
+            await sleep(randomDelay(700, 1200));
+            if (!running || skipRequested) return;
+
+            const submit = document.querySelector(
+                ".calculator :nth-child(3)"
+            );
+
+            if (submit) submit.click();
+
+        } else {
+            // Calcolo dei bit corretti
+            const digits = div.querySelector(".digits");
+            if (!digits) return;
+
+            let correct = Number(digits.innerText);
+            const correctBin = new Array(8).fill(false);
+
+            for (let i = 7; correct > 0 && i >= 0; i--) {
+                correctBin[i] = Boolean(correct % 2);
+                correct = Math.floor(correct / 2);
+            }
+
+            console.log("Risposta:", correctBin);
+
+            const bits = Array.from(
+                div.querySelectorAll("button.bit")
+            );
+
+            for (let i = 0; i < bits.length; i++) {
+                if (!running || skipRequested) return;
+
+                if ((bits[i].innerText === "1") !== correctBin[i]) {
+                    bits[i].click();
+                    await sleep(randomDelay(600, 1000));
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Errore durante il calcolo:", error);
+    } finally {
+        busy = false;
+    }
+}
+
+async function start() {
+    if (running) return;
+
+    running = true;
+    console.log("Avviato — . avvia | - ferma | , o M salto");
+
+    try {
+        while (running) {
+            if (!skipRequested) {
+                await runStep();
+            }
+
+            if (running) {
+                await sleep(randomDelay(1500, 2500));
+            }
+        }
+    } finally {
+        running = false;
+        busy = false;
+        console.log("Terminato");
+    }
+}
+
+function stop() {
+    running = false;
+    skipRequested = false;
+    console.log("Script fermato");
+}
+
+async function skipCurrentProblem() {
+    if (!running || skipRequested) return;
+
+    skipRequested = true;
+    console.log("Richiesta di salto...");
+
+    // Attendi che il passaggio corrente si interrompa
+    while (busy && running) {
+        await sleep(100);
+    }
+
+    if (!running) return;
+
+    await sleep(500);
+
+    // Non inventare un pulsante di salto:
+    // il selettore corretto dipende dal gioco.
+    console.log(
+        "Calcolo sospeso per questo passaggio. " +
+        "Per saltare davvero serve il pulsante di salto del gioco."
+    );
+
+    skipRequested = false;
+}
+
+document.addEventListener("keydown", function(event) {
+    if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) {
+        return;
+    }
+
+    if (event.key === ".") {
+        start();
+    } else if (event.key === "-") {
+        stop();
+    } else if (event.key === "," || event.key.toLowerCase() === "m") {
+        skipCurrentProblem();
+    }
+});
